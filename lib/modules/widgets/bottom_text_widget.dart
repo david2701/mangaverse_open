@@ -78,7 +78,7 @@ class BottomTextWidget extends StatelessWidget {
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          Colors.black.withValues(alpha: 0.6)
+                          Colors.black.withValues(alpha: 0.9)
                         ],
                         stops: const [0, 1],
                       ),
@@ -92,7 +92,7 @@ class BottomTextWidget extends StatelessWidget {
                           child: Text(
                             text,
                             style: TextStyle(
-                              fontSize: 13.0,
+                              fontSize: 15.0,
                               color: textColor ?? Colors.white,
                               shadows: const <Shadow>[
                                 Shadow(

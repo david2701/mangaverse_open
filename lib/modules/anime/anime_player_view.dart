@@ -672,7 +672,7 @@ class _AnimeStreamPageState extends riv.ConsumerState<AnimeStreamPage>
 
   Widget _mobileBottomButtonBar(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 30),
+      padding: const EdgeInsets.only(bottom: 50),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [

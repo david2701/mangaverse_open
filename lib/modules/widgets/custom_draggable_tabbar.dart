@@ -43,14 +43,22 @@ Future<void> customDraggableTabBar(
   final controller = DraggableMenuController();
   late TabController tabBarController;
   tabBarController = TabController(length: tabs.length, vsync: vsync);
-  final maxHeight = context.height(0.8);
+  final maxHeight = context.height(0.5);
+  final minHeight = context.height(0.3);
 
   int index = 0;
   List<Map<String, dynamic>> widgetsHeight = [];
 
   void refresh() {
-    controller.animateTo(
-        widgetsHeight.indexWhere((element) => element["index"] == index));
+    if (widgetsHeight.isEmpty) return;
+    final targetIndex = widgetsHeight.indexWhere((element) => element["index"] == index);
+    if (targetIndex >= 0) {
+      try {
+        controller.animateTo(targetIndex);
+      } catch (_) {
+        // Ignorar errores si el controlador no está listo
+      }
+    }
   }
 
   tabBarController.animation!.addListener(() {
@@ -72,120 +80,180 @@ Future<void> customDraggableTabBar(
           children: [
             for (var i = 0; i < children.length; i++) ...[
               MeasureWidgetSize(
-                  onCalculateSize: (size) {
-                    final additionnalHeight =
-                        ((List.generate(10000, (index) => index * 0.0001))
-                              ..shuffle())
-                            .first;
-                    double newHeight = size!.height + 52.0 + additionnalHeight;
-                    if (!(newHeight <= maxHeight)) {
-                      newHeight = maxHeight + additionnalHeight;
-                    }
-                    widgetsHeight.add({"index": i, "height": newHeight});
-                    if (widgetsHeight.length == children.length) {
-                      Navigator.pop(context);
-                    }
-                  },
-                  child: children[i])
+                onCalculateSize: (size) {
+                  if (size == null) return;
+                  double newHeight = size.height + 52.0;
+                  newHeight = newHeight.clamp(minHeight, maxHeight);
+                  widgetsHeight.add({"index": i, "height": newHeight});
+                  if (widgetsHeight.length == children.length) {
+                    Navigator.pop(context);
+                  }
+                },
+                child: children[i],
+              )
             ]
           ],
         ),
       );
     },
   );
-  widgetsHeight
-      .sort((a, b) => (a["height"] as double).compareTo(b["height"] as double));
+
+  if (widgetsHeight.isEmpty) {
+    widgetsHeight.add({"index": 0, "height": minHeight});
+  }
+
+  widgetsHeight.sort((a, b) => (a["height"] as double).compareTo(b["height"] as double));
+
   if (context.mounted) {
     await DraggableMenu.open(
-        context,
-        DraggableMenu(
-            curve: Curves.linearToEaseOut,
-            controller: controller,
-            levels: widgetsHeight
-                .map((e) => e["height"])
-                .map((e) => DraggableMenuLevel(height: e))
-                .toList(),
-            customUi: Consumer(builder: (context, ref, child) {
-              final location =
-                  ref.watch(routerCurrentLocationStateProvider(context));
-              final width = context.isTablet && !fullWidth
-                  ? switch (location) {
-                      null => 100,
-                      != '/MangaLibrary' &&
-                            != '/AnimeLibrary' &&
-                            != '/history' &&
-                            != '/browse' &&
-                            != '/more' =>
-                        0,
-                      _ => 100,
-                    }
-                  : 0;
-              return Scaffold(
-                backgroundColor: Platform.isLinux ? null : Colors.transparent,
-                body: Container(
-                  width: context.width(1) - width,
-                  decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(20),
-                          topRight: Radius.circular(20)),
-                      color: Theme.of(context).scaffoldBackgroundColor),
-                  child: DefaultTabController(
-                    length: tabs.length,
-                    child: Column(children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Flexible(
-                            flex: 9,
-                            child: TabBar(
-                                unselectedLabelStyle: const TextStyle(
-                                    fontWeight: FontWeight.w500),
-                                labelStyle: const TextStyle(
-                                    fontWeight: FontWeight.bold),
-                                dividerColor: context.isLight
-                                    ? Colors.black
-                                    : Colors.grey,
-                                dividerHeight: 0.4,
-                                controller: tabBarController,
-                                tabs: tabs),
-                          ),
-                          if (moreWidget != null)
-                            Flexible(
-                              flex: 1,
-                              child: Column(
-                                children: [
-                                  moreWidget,
-                                  const SizedBox(height: 2),
-                                  Row(
-                                    children: [
-                                      Flexible(
-                                        child: Container(
-                                            color: context.isLight
-                                                ? Colors.black
-                                                : Colors.grey,
-                                            height: 0.4),
-                                      ),
-                                    ],
-                                  )
-                                ],
-                              ),
-                            )
-                        ],
-                      ),
-                      Flexible(
-                          child: TabBarView(
-                              controller: tabBarController,
-                              children: children
-                                  .map((e) => SingleChildScrollView(
-                                      child: MeasureWidgetSize(
-                                          onCalculateSize: (_) => refresh(),
-                                          child: e)))
-                                  .toList()))
-                    ]),
+      context,
+      DraggableMenu(
+        curve: Curves.linearToEaseOut,
+        controller: controller,
+        levels: widgetsHeight
+            .map((e) => DraggableMenuLevel(height: e["height"] as double))
+            .toList(),
+        customUi: Consumer(builder: (context, ref, child) {
+          final location = ref.watch(routerCurrentLocationStateProvider(context));
+          final width = context.isTablet && !fullWidth
+              ? switch (location) {
+                  null => 100,
+                  != '/MangaLibrary' &&
+                        != '/AnimeLibrary' &&
+                        != '/history' &&
+                        != '/browse' &&
+                        != '/more' =>
+                    0,
+                  _ => 100,
+                }
+              : 0;
+
+          return Scaffold(
+            backgroundColor: Platform.isLinux ? null : Colors.transparent,
+            body: Container(
+              width: context.width(1) - width,
+              constraints: BoxConstraints(
+                minHeight: minHeight,
+              ),
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                color: Theme.of(context).scaffoldBackgroundColor,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    spreadRadius: 1,
                   ),
-                ),
-              );
-            }),
-            child: const SizedBox.shrink()));
+                ],
+              ),
+              child: Column(
+                children: [
+                  // Barra superior con indicador de arrastre
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Theme.of(context).dividerColor.withOpacity(0.1),
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                    child: Center(
+                      child: Container(
+                        height: 5,
+                        width: 50,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).dividerColor.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  // TabBar mejorado
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Theme(
+                            data: Theme.of(context).copyWith(
+                              splashColor: Colors.transparent,
+                              highlightColor: Colors.transparent,
+                            ),
+                            child: TabBar(
+                              controller: tabBarController,
+                              tabs: tabs,
+                              labelStyle: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                              ),
+                              unselectedLabelStyle: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                                fontSize: 15,
+                              ),
+                              indicator: BoxDecoration(
+                                borderRadius: BorderRadius.circular(10),
+                                color: Theme.of(context).primaryColor.withOpacity(0.1),
+                              ),
+                              labelColor: Theme.of(context).primaryColor,
+                              unselectedLabelColor: Theme.of(context).hintColor,
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            ),
+                          ),
+                        ),
+                        if (moreWidget != null)
+                          Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: BoxDecoration(
+                              border: Border(
+                                left: BorderSide(
+                                  color: Theme.of(context).dividerColor.withOpacity(0.2),
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              child: moreWidget,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  // Contenido con más espacio
+                  Expanded(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      child: TabBarView(
+                        controller: tabBarController,
+                        children: children.map((e) => SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            child: MeasureWidgetSize(
+                              onCalculateSize: (_) => refresh(),
+                              child: e,
+                            ),
+                          ),
+                        )).toList(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+        child: const SizedBox.shrink(),
+      ),
+    );
   }
 }

@@ -1,5 +1,7 @@
 import 'package:isar/isar.dart';
 import 'package:mangayomi/models/manga.dart';
+import 'package:isar_flutter_libs/isar_flutter_libs.dart';
+
 part 'chapter.g.dart';
 
 @collection
@@ -65,4 +67,13 @@ class Chapter {
         'scanlator': scanlator,
         'url': url
       };
+
+  Future<void> update() async {
+    final isar = Isar.getInstance();
+    if (isar != null) {
+      await isar.writeTxn(() async {
+        await isar.chapters.put(this);
+      });
+    }
+  }
 }

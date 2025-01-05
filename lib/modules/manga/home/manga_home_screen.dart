@@ -144,7 +144,17 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
     };
     return Scaffold(
         appBar: AppBar(
-          title: _isSearch ? null : Text('${source.name}'),
+          elevation: 0,
+          centerTitle: true,
+          title: _isSearch 
+            ? null 
+            : Text(
+                '${source.name}',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                ),
+              ),
           leading: !_isSearch ? null : Container(),
           actions: [
             _isSearch
@@ -282,8 +292,8 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
             preferredSize: Size.fromHeight(AppBar().preferredSize.height * 0.8),
             child: Column(
               children: [
-                SizedBox(
-                  width: context.width(1),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 12),
                   height: 45,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
@@ -296,345 +306,396 @@ class _MangaHomeScreenState extends ConsumerState<MangaHomeScreen> {
                       if (!supportsLatest && index == 1) {
                         return const SizedBox.shrink();
                       }
-                      return MangasCardSelector(
-                        icon: _types(context)[index].icon,
-                        selected: _selectedIndex == index,
-                        text: _types(context)[index].title,
-                        onPressed: () async {
-                          if (filters.isEmpty) {
-                            filters = filterList;
-                          }
-                          if (index == 2) {
-                            final result = await showModalBottomSheet(
-                              context: context,
-                              builder: (context) =>
-                                  StatefulBuilder(builder: (context, setState) {
-                                return Column(
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Row(
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          decoration: BoxDecoration(
+                            color: _selectedIndex == index 
+                                ? context.primaryColor
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: _selectedIndex == index
+                                  ? context.primaryColor
+                                  : context.primaryColor.withOpacity(0.5),
+                            ),
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () {
+                                if (filters.isEmpty) {
+                                  filters = filterList;
+                                }
+                                if (index == 2) {
+                                  final result = showModalBottomSheet(
+                                    context: context,
+                                    builder: (context) =>
+                                        StatefulBuilder(builder: (context, setState) {
+                                      return Column(
                                         children: [
-                                          TextButton(
-                                            onPressed: () {
-                                              setState(() {
-                                                filters = getFilterList(
-                                                    source: source);
-                                              });
-                                            },
-                                            child: Text(l10n.reset),
+                                          Padding(
+                                            padding: const EdgeInsets.all(8.0),
+                                            child: Row(
+                                              children: [
+                                                TextButton(
+                                                  onPressed: () {
+                                                    setState(() {
+                                                      filters = getFilterList(
+                                                          source: source);
+                                                    });
+                                                  },
+                                                  child: Text(l10n.reset),
+                                                ),
+                                                const Spacer(),
+                                                ElevatedButton(
+                                                  style: ElevatedButton.styleFrom(
+                                                      backgroundColor:
+                                                          context.primaryColor),
+                                                  onPressed: () {
+                                                    Navigator.pop(context, 'filter');
+                                                  },
+                                                  child: Text(
+                                                    l10n.filter,
+                                                    style: TextStyle(
+                                                        color: Theme.of(context)
+                                                            .scaffoldBackgroundColor),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
-                                          const Spacer(),
-                                          ElevatedButton(
-                                            style: ElevatedButton.styleFrom(
-                                                backgroundColor:
-                                                    context.primaryColor),
-                                            onPressed: () {
-                                              Navigator.pop(context, 'filter');
-                                            },
-                                            child: Text(
-                                              l10n.filter,
-                                              style: TextStyle(
-                                                  color: Theme.of(context)
-                                                      .scaffoldBackgroundColor),
+                                          const Divider(),
+                                          Expanded(
+                                            child: FilterWidget(
+                                              filterList: filters,
+                                              onChanged: (values) {
+                                                setState(() {
+                                                  filters = values;
+                                                });
+                                              },
                                             ),
                                           ),
                                         ],
-                                      ),
+                                      );
+                                    }),
+                                  );
+                                  if (result == 'filter') {
+                                    _mangaList.clear();
+                                    if (mounted) {
+                                      setState(() {
+                                        _selectedIndex = 2;
+                                        _isFiltering = true;
+                                        _page = 1;
+                                        _isLoading = false;
+                                      });
+                                    }
+
+                                    _getManga = ref.refresh(searchProvider(
+                                        source: source,
+                                        query: _query,
+                                        page: 1,
+                                        filterList: filters));
+                                  }
+                                } else {
+                                  _mangaList.clear();
+                                  setState(() {
+                                    _selectedIndex = index;
+                                    _isFiltering = false;
+                                    _isSearch = false;
+                                    _query = "";
+                                    _textEditingController.clear();
+                                    _page = 1;
+                                    _isLoading = false;
+                                  });
+                                }
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      _types(context)[index].icon,
+                                      size: 18,
+                                      color: _selectedIndex == index
+                                          ? Theme.of(context).scaffoldBackgroundColor
+                                          : context.primaryColor,
                                     ),
-                                    const Divider(),
-                                    Expanded(
-                                      child: FilterWidget(
-                                        filterList: filters,
-                                        onChanged: (values) {
-                                          setState(() {
-                                            filters = values;
-                                          });
-                                        },
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      _types(context)[index].title,
+                                      style: TextStyle(
+                                        color: _selectedIndex == index
+                                            ? Theme.of(context).scaffoldBackgroundColor
+                                            : context.primaryColor,
+                                        fontWeight: _selectedIndex == index
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
                                       ),
                                     ),
                                   ],
-                                );
-                              }),
-                            );
-                            if (result == 'filter') {
-                              _mangaList.clear();
-                              if (mounted) {
-                                setState(() {
-                                  _selectedIndex = 2;
-                                  _isFiltering = true;
-                                  _page = 1;
-                                  _isLoading = false;
-                                });
-                              }
-
-                              _getManga = ref.refresh(searchProvider(
-                                  source: source,
-                                  query: _query,
-                                  page: 1,
-                                  filterList: filters));
-                            }
-                          } else {
-                            _mangaList.clear();
-                            setState(() {
-                              _selectedIndex = index;
-                              _isFiltering = false;
-                              _isSearch = false;
-                              _query = "";
-                              _textEditingController.clear();
-                              _page = 1;
-                              _isLoading = false;
-                            });
-                          }
-                        },
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       );
                     },
                   ),
                 ),
+                const SizedBox(height: 8),
                 Container(
-                  color: context.primaryColor,
-                  height: 0.3,
+                  color: context.primaryColor.withOpacity(0.1),
+                  height: 1,
                   width: context.width(1),
                 )
               ],
             ),
           ),
         ),
-        body: _getManga!.isLoading
-            ? const ProgressCenter()
-            : _getManga!.when(
-                data: (data) {
-                  if (_hasNextPage) {
-                    if (!data!.hasNextPage) {
-                      if (mounted) {
-                        setState(() {
-                          _hasNextPage = false;
-                        });
-                      }
-                    }
-                  }
-                  if (_mangaList.isEmpty && data!.list.isNotEmpty) {
-                    _mangaList.addAll(data.list);
-                  }
-                  Widget buildProgressIndicator() {
-                    return !(data!.list.isNotEmpty &&
-                            (data.hasNextPage || _hasNextPage))
-                        ? Container()
-                        : _isLoading
-                            ? const Center(
-                                child: SizedBox(
-                                  height: 100,
-                                  width: 200,
-                                  child: Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                ),
-                              )
-                            : Padding(
-                                padding: const EdgeInsets.all(4),
-                                child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(5))),
-                                    onPressed: () {
-                                      if (!_getManga!.isLoading) {
-                                        if (mounted) {
-                                          setState(() {
-                                            _isLoading = true;
-                                          });
-                                        }
-                                        _loadMore().then((value) {
-                                          if (mounted && value != null) {
-                                            setState(() {
-                                              _mangaList.addAll(value.list);
-                                              _isLoading = false;
-                                            });
-                                          }
-                                        });
-                                      }
-                                    },
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.center,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          l10n.load_more,
-                                          style: const TextStyle(
-                                              overflow: TextOverflow.ellipsis),
-                                          maxLines: 2,
-                                        ),
-                                        const Icon(
-                                            Icons.arrow_forward_outlined),
-                                      ],
-                                    )),
-                              );
-                  }
-
-                  if (data!.list.isEmpty) {
-                    return Center(child: Text(l10n.no_result));
-                  }
-                  _scrollController.addListener(() {
-                    if (_scrollController.position.pixels ==
-                        _scrollController.position.maxScrollExtent) {
-                      if (_mangaList.isNotEmpty &&
-                          (_hasNextPage) &&
-                          !_isLoading &&
-                          !_getManga!.isLoading) {
+        body: Container(
+          margin: const EdgeInsets.only(top: 8),
+          child: _getManga!.isLoading
+              ? const ProgressCenter()
+              : _getManga!.when(
+                  data: (data) {
+                    if (_hasNextPage) {
+                      if (!data!.hasNextPage) {
                         if (mounted) {
                           setState(() {
-                            _isLoading = true;
+                            _hasNextPage = false;
                           });
                         }
-                        _loadMore().then((value) {
-                          if (mounted && value != null) {
-                            setState(() {
-                              _mangaList.addAll(value.list);
-                              _isLoading = false;
-                            });
-                          }
-                        });
                       }
                     }
-                  });
+                    if (_mangaList.isEmpty && data!.list.isNotEmpty) {
+                      _mangaList.addAll(data.list);
+                    }
+                    Widget buildProgressIndicator() {
+                      return !(data!.list.isNotEmpty &&
+                              (data.hasNextPage || _hasNextPage))
+                          ? Container()
+                          : _isLoading
+                              ? const Center(
+                                  child: SizedBox(
+                                    height: 100,
+                                    width: 200,
+                                    child: Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  ),
+                                )
+                              : Padding(
+                                  padding: const EdgeInsets.all(4),
+                                  child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(5))),
+                                      onPressed: () {
+                                        if (!_getManga!.isLoading) {
+                                          if (mounted) {
+                                            setState(() {
+                                              _isLoading = true;
+                                            });
+                                          }
+                                          _loadMore().then((value) {
+                                            if (mounted && value != null) {
+                                              setState(() {
+                                                _mangaList.addAll(value.list);
+                                                _isLoading = false;
+                                              });
+                                            }
+                                          });
+                                        }
+                                      },
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            l10n.load_more,
+                                            style: const TextStyle(
+                                                overflow: TextOverflow.ellipsis),
+                                            maxLines: 2,
+                                          ),
+                                          const Icon(
+                                              Icons.arrow_forward_outlined),
+                                        ],
+                                      )),
+                                );
+                    }
 
-                  _length =
-                      source.isFullData! ? _fullDataLength : _mangaList.length;
-                  _length = (_mangaList.length < _length
-                      ? _mangaList.length
-                      : _length);
-                  final isComfortableGrid =
-                      displayType == DisplayType.comfortableGrid;
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 10),
-                    child: Column(
-                      children: [
-                        Flexible(
-                            child: displayType == DisplayType.list
-                                ? ListViewWidget(
-                                    controller: _scrollController,
-                                    itemCount: _length + 1,
-                                    itemBuilder: (context, index) {
-                                      if (index == _length) {
-                                        return buildProgressIndicator();
-                                      }
-                                      return MangaHomeImageCardListTile(
-                                          itemType: source.itemType,
-                                          manga: _mangaList[index],
-                                          source: source);
-                                    })
-                                : Consumer(builder: (context, ref, child) {
-                                    final gridSize = ref.watch(
-                                        libraryGridSizeStateProvider(
-                                            itemType: source.itemType));
+                    if (data!.list.isEmpty) {
+                      return Center(child: Text(l10n.no_result));
+                    }
+                    _scrollController.addListener(() {
+                      if (_scrollController.position.pixels ==
+                          _scrollController.position.maxScrollExtent) {
+                        if (_mangaList.isNotEmpty &&
+                            (_hasNextPage) &&
+                            !_isLoading &&
+                            !_getManga!.isLoading) {
+                          if (mounted) {
+                            setState(() {
+                              _isLoading = true;
+                            });
+                          }
+                          _loadMore().then((value) {
+                            if (mounted && value != null) {
+                              setState(() {
+                                _mangaList.addAll(value.list);
+                                _isLoading = false;
+                              });
+                            }
+                          });
+                        }
+                      }
+                    });
 
-                                    return GridViewWidget(
-                                      gridSize: gridSize,
+                    _length =
+                        source.isFullData! ? _fullDataLength : _mangaList.length;
+                    _length = (_mangaList.length < _length
+                        ? _mangaList.length
+                        : _length);
+                    final isComfortableGrid =
+                        displayType == DisplayType.comfortableGrid;
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Column(
+                        children: [
+                          Flexible(
+                              child: displayType == DisplayType.list
+                                  ? ListViewWidget(
                                       controller: _scrollController,
                                       itemCount: _length + 1,
-                                      childAspectRatio:
-                                          isComfortableGrid ? 0.642 : 0.69,
                                       itemBuilder: (context, index) {
                                         if (index == _length) {
                                           return buildProgressIndicator();
                                         }
-                                        return MangaHomeImageCard(
-                                          itemType: source.itemType,
-                                          manga: _mangaList[index],
-                                          source: source,
-                                          isComfortableGrid: isComfortableGrid,
-                                        );
-                                      },
-                                    );
-                                  })),
-                      ],
-                    ),
-                  );
-                },
-                error: (error, stackTrace) => Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(15),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Column(
-                            children: [
-                              IconButton(
-                                  onPressed: () {
-                                    if (_selectedIndex == 2 &&
-                                            (_isSearch && _query.isNotEmpty) ||
-                                        _isFiltering) {
-                                      ref.invalidate(searchProvider(
-                                          source: source,
-                                          query: _query,
-                                          page: 1,
-                                          filterList: filters));
-                                    } else if (_selectedIndex == 1 &&
-                                        !_isSearch &&
-                                        _query.isEmpty) {
-                                      ref.invalidate(getLatestUpdatesProvider(
-                                          source: source, page: 1));
-                                    } else if (_selectedIndex == 0 &&
-                                        !_isSearch &&
-                                        _query.isEmpty) {
-                                      ref.invalidate(getPopularProvider(
-                                        source: source,
-                                        page: 1,
-                                      ));
-                                    }
-                                  },
-                                  icon: const Icon(Icons.refresh)),
-                              Text(l10n.refresh)
-                            ],
-                          ),
-                          const SizedBox(
-                            width: 20,
-                          ),
-                          Column(
-                            children: [
-                              IconButton(
-                                onPressed: () async {
-                                  final baseUrl = ref.watch(
-                                      sourceBaseUrlProvider(source: source));
-                                  Map<String, dynamic> data = {
-                                    'url': baseUrl,
-                                    'sourceId': source.id.toString(),
-                                    'title': '',
-                                    "hasCloudFlare":
-                                        source.hasCloudflare ?? false
-                                  };
-                                  context.push("/mangawebview", extra: data);
-                                },
-                                icon: Icon(
-                                  Icons.public,
-                                  size: 22,
-                                  color: context.secondaryColor,
-                                ),
-                              ),
-                              const Text("Webview")
-                            ],
-                          )
+                                        return MangaHomeImageCardListTile(
+                                            itemType: source.itemType,
+                                            manga: _mangaList[index],
+                                            source: source);
+                                      })
+                                  : Consumer(builder: (context, ref, child) {
+                                      final gridSize = ref.watch(
+                                          libraryGridSizeStateProvider(
+                                              itemType: source.itemType));
+
+                                      return GridViewWidget(
+                                        gridSize: gridSize,
+                                        controller: _scrollController,
+                                        itemCount: _length + 1,
+                                        childAspectRatio:
+                                            isComfortableGrid ? 0.642 : 0.69,
+                                        itemBuilder: (context, index) {
+                                          if (index == _length) {
+                                            return buildProgressIndicator();
+                                          }
+                                          return MangaHomeImageCard(
+                                            itemType: source.itemType,
+                                            manga: _mangaList[index],
+                                            source: source,
+                                            isComfortableGrid: isComfortableGrid,
+                                          );
+                                        },
+                                      );
+                                    })),
                         ],
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text(
-                        error.toString(),
-                        textAlign: TextAlign.center,
+                    );
+                  },
+                  error: (error, stackTrace) => Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(15),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Column(
+                              children: [
+                                IconButton(
+                                    onPressed: () {
+                                      if (_selectedIndex == 2 &&
+                                              (_isSearch && _query.isNotEmpty) ||
+                                          _isFiltering) {
+                                        ref.invalidate(searchProvider(
+                                            source: source,
+                                            query: _query,
+                                            page: 1,
+                                            filterList: filters));
+                                      } else if (_selectedIndex == 1 &&
+                                          !_isSearch &&
+                                          _query.isEmpty) {
+                                        ref.invalidate(getLatestUpdatesProvider(
+                                            source: source, page: 1));
+                                      } else if (_selectedIndex == 0 &&
+                                          !_isSearch &&
+                                          _query.isEmpty) {
+                                        ref.invalidate(getPopularProvider(
+                                          source: source,
+                                          page: 1,
+                                        ));
+                                      }
+                                    },
+                                    icon: const Icon(Icons.refresh)),
+                                Text(l10n.refresh)
+                              ],
+                            ),
+                            const SizedBox(
+                              width: 20,
+                            ),
+                            Column(
+                              children: [
+                                IconButton(
+                                  onPressed: () async {
+                                    final baseUrl = ref.watch(
+                                        sourceBaseUrlProvider(source: source));
+                                    Map<String, dynamic> data = {
+                                      'url': baseUrl,
+                                      'sourceId': source.id.toString(),
+                                      'title': '',
+                                      "hasCloudFlare":
+                                          source.hasCloudflare ?? false
+                                    };
+                                    context.push("/mangawebview", extra: data);
+                                  },
+                                  icon: Icon(
+                                    Icons.public,
+                                    size: 22,
+                                    color: context.secondaryColor,
+                                  ),
+                                ),
+                                const Text("Webview")
+                              ],
+                            )
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Text(
+                          error.toString(),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                  ),
+                  loading: () => const Center(
+                    child: CircularProgressIndicator(),
+                  ),
                 ),
-                loading: () => const Center(
-                  child: CircularProgressIndicator(),
-                ),
-              ));
+        ));
   }
 }
 
@@ -658,13 +719,18 @@ class _MangaHomeImageCardState extends ConsumerState<MangaHomeImageCard>
     with AutomaticKeepAliveClientMixin<MangaHomeImageCard> {
   @override
   Widget build(BuildContext context) {
-    super.build(context);
-
-    return MangaImageCardWidget(
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: MangaImageCardWidget(
         getMangaDetail: widget.manga,
         source: widget.source,
         itemType: widget.itemType,
-        isComfortableGrid: widget.isComfortableGrid);
+        isComfortableGrid: widget.isComfortableGrid,
+      ),
+    );
   }
 
   @override

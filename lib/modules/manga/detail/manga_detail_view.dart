@@ -129,23 +129,159 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                 sortChapter: sortChapter,
                 filterScanlator: scanlators.$2);
             ref.read(chaptersListttStateProvider.notifier).set(chapters);
-            return _buildWidget(
-                chapters: chapters,
-                reverse: reverse,
-                chapterList: chapterNameList,
-                isLongPressed: isLongPressed);
+            return Scaffold(
+              backgroundColor: Colors.transparent,
+              extendBodyBehindAppBar: true,
+              appBar: _buildAppBar(isLongPressed, chapterNameList),
+              body: context.isTablet
+                  ? _buildTabletLayout(chapters, reverse, chapterNameList, isLongPressed)
+                  : _buildMobileLayout(chapters, reverse, chapterNameList, isLongPressed),
+            );
           },
-          error: (Object error, StackTrace stackTrace) {
-            return ErrorText(error);
-          },
-          loading: () {
-            return _buildWidget(
-                chapters: widget.manga!.chapters.toList().reversed.toList(),
-                reverse: reverse,
-                chapterList: chapterNameList,
-                isLongPressed: isLongPressed);
-          },
+          error: (error, stack) => ErrorText(error),
+          loading: () => _buildLoadingLayout(),
         ));
+  }
+
+  Widget _buildTabletLayout(List<Chapter> chapters, bool reverse, List<Chapter> chapterList, bool isLongPressed) {
+    return Row(
+      children: [
+        Expanded(
+          flex: 4,
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                _buildHeroHeader(),
+                _buildMangaInfo(),
+                if (!isLocalArchive) _actionFavouriteAndWebview(),
+                _buildDescription(),
+                _buildGenresList(),
+              ],
+            ),
+          ),
+        ),
+        Expanded(
+          flex: 5,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(32),
+                bottomLeft: Radius.circular(32),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(-5, 0),
+                ),
+              ],
+            ),
+            child: _buildChaptersList(chapters, reverse, chapterList, isLongPressed),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobileLayout(List<Chapter> chapters, bool reverse, List<Chapter> chapterList, bool isLongPressed) {
+    return CustomScrollView(
+      controller: _scrollController,
+      slivers: [
+        SliverToBoxAdapter(
+          child: Column(
+            children: [
+              _buildHeroHeader(),
+              _buildMangaInfo(),
+              if (!isLocalArchive) _actionFavouriteAndWebview(),
+              _buildDescription(),
+              _buildGenresList(),
+            ],
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          sliver: SliverToBoxAdapter(
+            child: _buildChapterHeader(),
+          ),
+        ),
+        _buildChaptersList(chapters, reverse, chapterList, isLongPressed),
+      ],
+    );
+  }
+
+  Widget _buildHeroHeader() {
+    return Stack(
+      children: [
+        ShaderMask(
+          shaderCallback: (rect) {
+            return LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black,
+                Colors.transparent,
+              ],
+            ).createShader(Rect.fromLTRB(0, 0, rect.width, rect.height));
+          },
+          blendMode: BlendMode.dstIn,
+          child: Image.network(
+            widget.manga!.imageUrl ?? "",
+            height: 300,
+            width: double.infinity,
+            fit: BoxFit.cover,
+          ),
+        ),
+
+        Positioned(
+          bottom: 20,
+          left: 20,
+          right: 20,
+          child: Row(
+            children: [
+              Hero(
+                tag: 'manga-cover-${widget.manga!.id}',
+                child: Container(
+                  width: 120,
+                  height: 180,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 10,
+                      ),
+                    ],
+                    image: DecorationImage(
+                      image: NetworkImage(widget.manga!.imageUrl ?? ""),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.manga!.name ?? "",
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    widget.titleDescription ?? const SizedBox(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   List<Chapter> _filterAndSortChapter(
@@ -1033,7 +1169,8 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                                       builder: (context, ref, child) {
                                     final scanlators = ref.watch(
                                         scanlatorsFilterStateProvider(
-                                            widget.manga!));
+                                            widget
+                                                .manga!));
                                     return AlertDialog(
                                       title: Text(
                                         l10n.filter_scanlator_groups,
@@ -1406,12 +1543,11 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                                     if (manga!.source == "torrent") {
                                       addTorrent(context, manga: manga);
                                     } else {
-                                      await ref.watch(
-                                          importArchivesFromFileProvider(
-                                                  itemType: manga.itemType,
-                                                  manga,
-                                                  init: false)
-                                              .future);
+                                      await ref.watch(importArchivesFromFileProvider(
+                                        itemType: manga.itemType,
+                                        manga,
+                                        init: false
+                                      ).future);
                                     }
                                   },
                                 )
@@ -2007,14 +2143,390 @@ class _MangaDetailViewState extends ConsumerState<MangaDetailView>
                                 },
                                 id: entries[index].syncId!,
                                 entries: const []);
-                      });
-                },
+                        });
+                  },
                 separatorBuilder: (BuildContext context, int index) {
                   return const Divider();
                 },
               ),
             ),
           ),
-        ));
+        ),
+  );
+  }
+
+  PreferredSizeWidget _buildAppBar(bool isLongPressed, List<Chapter> chapterList) {
+    return PreferredSize(
+      preferredSize: Size.fromHeight(AppBar().preferredSize.height),
+      child: Consumer(
+        builder: (context, ref, child) {
+          final l10n = l10nLocalizations(context)!;
+          final isNotFiltering = ref.watch(chapterFilterResultStateProvider(manga: widget.manga!));
+
+          if (isLongPressed) {
+            return AppBar(
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              title: Text(chapterList.length.toString()),
+              leading: IconButton(
+                onPressed: () {
+                  ref.read(chaptersListStateProvider.notifier).clear();
+                  ref.read(isLongPressedStateProvider.notifier).update(!isLongPressed);
+                },
+                icon: const Icon(Icons.clear)
+              ),
+              actions: _buildAppBarActions(chapterList),
+            );
+          }
+
+          return AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            title: ref.watch(offetProvider) > 200
+                ? Text(widget.manga!.name!, style: const TextStyle(fontSize: 17))
+                : null,
+            actions: [
+              if (!isLocalArchive) _buildDownloadButton(),
+              IconButton(
+                icon: Icon(Icons.filter_list_sharp,
+                  color: isNotFiltering ? null : Colors.yellow
+                ),
+                onPressed: _showDraggableMenu,
+              ),
+              _buildOverflowMenu(),
+            ],
+          );
+        }
+      )
+    );
+  }
+
+  Widget _buildLoadingLayout() {
+    return const Center(
+      child: CircularProgressIndicator(),
+    );
+  }
+
+  Widget _buildMangaInfo() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _buildInfoCard(
+                icon: Icons.menu_book,
+                title: _formatStatus(widget.manga!.status),
+                subtitle: "Status"
+              ),
+              _buildInfoCard(
+                icon: Icons.source,
+                title: widget.manga!.source ?? "Unknown",
+                subtitle: "Source"
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatStatus(Status? status) {
+    if (status == null) return "Unknown";
+    
+    // Convertimos ONGOING a "Ongoing", COMPLETED a "Completed", etc.
+    return status.name[0].toUpperCase() + status.name.substring(1).toLowerCase();
+  }
+
+  Widget _buildInfoCard({required IconData icon, required String title, required String subtitle}) {
+    return Expanded(
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            children: [
+              Icon(icon, size: 24),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.bodySmall?.color,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDescription() {
+    if (widget.manga!.description == null) return const SizedBox();
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Description",
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          ReadMoreWidget(
+            text: widget.manga!.description!,
+            onChanged: (value) {
+              setState(() {
+                _expanded = value;
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGenresList() {
+    if (widget.manga!.genre?.isEmpty ?? true) return const SizedBox();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Genres",
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: widget.manga!.genre!.map((genre) =>
+              Chip(
+                label: Text(genre),
+                backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+              )
+            ).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChapterHeader() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            "Chapters",
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          if (isLocalArchive)
+            ElevatedButton.icon(
+              icon: const Icon(Icons.add),
+              label: Text(widget.manga!.itemType != ItemType.anime
+                ? context.l10n.add_chapters
+                : context.l10n.add_episodes
+              ),
+              onPressed: () async {
+                final manga = widget.manga;
+                if (manga!.source == "torrent") {
+                  addTorrent(context, manga: manga);
+                } else {
+                  await ref.watch(importArchivesFromFileProvider(
+                    itemType: manga.itemType,
+                    manga,
+                    init: false
+                  ).future);
+                }
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChaptersList(List<Chapter> chapters, bool reverse, List<Chapter> chapterList, bool isLongPressed) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      sliver: SuperSliverList.builder(
+        itemCount: chapters.length,
+        itemBuilder: (context, index) {
+          final chapter = reverse ? chapters.reversed.toList()[index] : chapters[index];
+          return ChapterListTileWidget(
+            chapter: chapter,
+            chapterList: chapterList,
+            sourceExist: widget.sourceExist,
+          );
+        },
+      ),
+    );
+  }
+
+  List<Widget> _buildAppBarActions(List<Chapter> chapterList) {
+    return [
+      IconButton(
+        onPressed: () {
+          for (var chapter in chapterList) {
+            ref.read(chaptersListStateProvider.notifier).selectAll(chapter);
+          }
+        },
+        icon: const Icon(Icons.select_all)
+      ),
+      IconButton(
+        onPressed: () {
+          if (chapterList.length == chapterList.length) {
+            for (var chapter in chapterList) {
+              ref.read(chaptersListStateProvider.notifier).selectSome(chapter);
+            }
+            ref.read(isLongPressedStateProvider.notifier).update(false);
+          } else {
+            for (var chapter in chapterList) {
+              ref.read(chaptersListStateProvider.notifier).selectSome(chapter);
+            }
+          }
+        },
+        icon: const Icon(Icons.flip_to_back_rounded)
+      ),
+    ];
+  }
+
+  Widget _buildDownloadButton() {
+    return PopupMenuButton(
+      popUpAnimationStyle: popupAnimationStyle,
+      icon: const Icon(Icons.download_outlined),
+      itemBuilder: (context) {
+        return [
+          PopupMenuItem<int>(
+            value: 0,
+            child: Text(widget.itemType != ItemType.anime
+              ? context.l10n.next_chapter
+              : context.l10n.next_episode)
+          ),
+          PopupMenuItem<int>(
+            value: 1,
+            child: Text(widget.itemType != ItemType.anime
+              ? context.l10n.next_5_chapters
+              : context.l10n.next_5_episodes)
+          ),
+          PopupMenuItem<int>(
+            value: 2,
+            child: Text(widget.itemType != ItemType.anime
+              ? context.l10n.next_10_chapters
+              : context.l10n.next_10_episodes)
+          ),
+          PopupMenuItem<int>(
+            value: 3,
+            child: Text(widget.itemType != ItemType.anime
+              ? context.l10n.next_25_chapters
+              : context.l10n.next_25_episodes)
+          ),
+          PopupMenuItem<int>(
+            value: 4,
+            child: Text(widget.itemType != ItemType.anime
+              ? context.l10n.unread
+              : context.l10n.unwatched)
+          ),
+        ];
+      },
+      onSelected: _handleDownloadSelection,
+    );
+  }
+
+  void _handleDownloadSelection(int value) {
+    final chapters = isar.chapters
+        .filter()
+        .idIsNotNull()
+        .mangaIdEqualTo(widget.manga!.id!)
+        .findAllSync();
+
+    if (value >= 0 && value <= 3) {
+      final lastChapterReadIndex = chapters.lastIndexWhere((element) => element.isRead == true);
+
+      if (lastChapterReadIndex == -1 ||
+          chapters.length == 1) {
+        _downloadChapter(chapters.first);
+      } else {
+        final length = switch (value) {
+          0 => 1,
+          1 => 5,
+          2 => 10,
+          _ => 25,
+        };
+
+        for (var i = 1; i < length + 1; i++) {
+          if (chapters.length > 1 &&
+              chapters.elementAtOrNull(lastChapterReadIndex + i) != null) {
+            _downloadChapter(chapters[lastChapterReadIndex + i]);
+          }
+        }
+      }
+    } else if (value == 4) {
+      final unreadChapters = chapters.where((chapter) => !chapter.isRead!).toList();
+      for (var chapter in unreadChapters) {
+        _downloadChapter(chapter);
+      }
+    }
+  }
+
+  void _downloadChapter(Chapter chapter) {
+    final entry = isar.downloads
+        .filter()
+        .idIsNotNull()
+        .chapterIdEqualTo(chapter.id)
+        .findFirstSync();
+
+    if (entry == null || !entry.isDownload!) {
+      ref.watch(downloadChapterProvider(chapter: chapter));
+    }
+  }
+
+  Widget _buildOverflowMenu() {
+    final l10n = l10nLocalizations(context)!;
+
+    return PopupMenuButton(
+      popUpAnimationStyle: popupAnimationStyle,
+      itemBuilder: (context) {
+        return [
+          if (!isLocalArchive)
+            PopupMenuItem<int>(value: 3, child: Text(l10n.refresh)),
+          if (widget.manga!.favorite!)
+            PopupMenuItem<int>(value: 0, child: Text(l10n.edit_categories)),
+          if (!isLocalArchive)
+            PopupMenuItem<int>(value: 2, child: Text(l10n.share)),
+        ];
+      },
+      onSelected: (value) {
+        if (value == 3) {
+          widget.checkForUpdate(true);
+        } else if (value == 0) {
+          context.push("/categories", extra: (
+            true,
+            widget.manga!.itemType == ItemType.manga
+                ? 0
+                : widget.manga!.itemType ==
+                        ItemType.anime
+                    ? 1
+                    : 2
+          ));
+        } else if (value == 2) {
+          final source = getSource(widget.manga!.lang!, widget.manga!.source!);
+          final url =
+              "${source!.baseUrl}${widget.manga!.link!.getUrlWithoutDomain}";
+          Share.share(url);
+        }
+      },
+    );
   }
 }
