@@ -16,143 +16,215 @@ import 'package:mangayomi/utils/language.dart';
 class ExtensionListTileWidget extends ConsumerStatefulWidget {
   final Source source;
   final bool isTestSource;
-  const ExtensionListTileWidget(
-      {super.key, required this.source, this.isTestSource = false});
+  final VoidCallback? onInstallComplete;
+
+  const ExtensionListTileWidget({
+    super.key,
+    required this.source,
+    this.isTestSource = false,
+    this.onInstallComplete,
+  });
 
   @override
-  ConsumerState<ExtensionListTileWidget> createState() =>
-      _ExtensionListTileWidgetState();
+  ConsumerState<ExtensionListTileWidget> createState() => _ExtensionListTileWidgetState();
 }
 
-class _ExtensionListTileWidgetState
-    extends ConsumerState<ExtensionListTileWidget> {
+class _ExtensionListTileWidgetState extends ConsumerState<ExtensionListTileWidget> {
   bool _isLoading = false;
-  @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final l10n = l10nLocalizations(context)!;
-    final updateAivalable = widget.isTestSource
-        ? false
-        : compareVersions(widget.source.version!, widget.source.versionLast!) <
-            0;
-    final sourceNotEmpty = widget.source.sourceCode != null &&
-        widget.source.sourceCode!.isNotEmpty;
 
-    return ListTile(
-        onTap: () async {
-          if (sourceNotEmpty || widget.isTestSource) {
+  Widget _buildSourceIcon() {
+    return Container(
+      height: 40,
+      width: 40,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceVariant,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: widget.source.iconUrl!.isEmpty
+          ? const Icon(Icons.extension_rounded)
+          : ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: cachedNetworkImage(
+          imageUrl: widget.source.iconUrl!,
+          fit: BoxFit.cover,
+          width: 40,
+          height: 40,
+          errorWidget: const SizedBox(
+            width: 40,
+            height: 40,
+            child: Center(
+              child: Icon(Icons.extension_rounded),
+            ),
+          ),
+          useCustomNetworkImage: false,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton(BuildContext context, String text, {bool isPrimary = false}) {
+    return Container(
+      height: 32,
+      child: TextButton(
+        onPressed: _isLoading ? null : () async {
+          if (widget.isTestSource || (!_needsUpdate && _isSourceInstalled)) {
+            context.push('/extension_detail', extra: widget.source);
+          } else {
+            await _handleInstallOrUpdate();
+          }
+        },
+        style: TextButton.styleFrom(
+          backgroundColor: isPrimary
+              ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+              : Theme.of(context).colorScheme.surfaceVariant,
+          foregroundColor: isPrimary
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.onSurface,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        child: _isLoading
+            ? SizedBox(
+          height: 16,
+          width: 16,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.0,
+            valueColor: AlwaysStoppedAnimation<Color>(
+              isPrimary
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+        )
+            : Text(
+          text,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
+  bool get _needsUpdate => !widget.isTestSource &&
+      compareVersions(widget.source.version!, widget.source.versionLast!) < 0;
+
+  bool get _isSourceInstalled => widget.source.sourceCode != null &&
+      widget.source.sourceCode!.isNotEmpty;
+
+  Future<void> _handleInstallOrUpdate() async {
+    setState(() => _isLoading = true);
+    try {
+      if (widget.source.itemType == ItemType.manga) {
+        await ref.watch(
+            fetchMangaSourcesListProvider(id: widget.source.id, reFresh: true)
+                .future);
+      } else if (widget.source.itemType == ItemType.anime) {
+        await ref.watch(
+            fetchAnimeSourcesListProvider(id: widget.source.id, reFresh: true)
+                .future);
+      } else {
+        await ref.watch(
+            fetchNovelSourcesListProvider(id: widget.source.id, reFresh: true)
+                .future);
+      }
+      widget.onInstallComplete?.call();
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = l10nLocalizations(context)!;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: ListTile(
+        onTap: _isLoading ? null : () async {
+          if (_isSourceInstalled || widget.isTestSource) {
             if (widget.isTestSource) {
               isar.writeTxnSync(() => isar.sources.putSync(widget.source));
             }
             context.push('/extension_detail', extra: widget.source);
           } else {
-            setState(() {
-              _isLoading = true;
-            });
-            widget.source.itemType == ItemType.manga
-                ? await ref.watch(fetchMangaSourcesListProvider(
-                        id: widget.source.id, reFresh: true)
-                    .future)
-                : widget.source.itemType == ItemType.anime
-                    ? await ref.watch(fetchAnimeSourcesListProvider(
-                            id: widget.source.id, reFresh: true)
-                        .future)
-                    : await ref.watch(fetchNovelSourcesListProvider(
-                            id: widget.source.id, reFresh: true)
-                        .future);
-            if (mounted) {
-              setState(() {
-                _isLoading = false;
-              });
-            }
+            await _handleInstallOrUpdate();
           }
         },
-        leading: Container(
-          height: 37,
-          width: 37,
-          decoration: BoxDecoration(
-              color:
-                  Theme.of(context).secondaryHeaderColor.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(5)),
-          child: widget.source.iconUrl!.isEmpty
-              ? const Icon(Icons.extension_rounded)
-              : cachedNetworkImage(
-                  imageUrl: widget.source.iconUrl!,
-                  fit: BoxFit.contain,
-                  width: 37,
-                  height: 37,
-                  errorWidget: const SizedBox(
-                    width: 37,
-                    height: 37,
-                    child: Center(
-                      child: Icon(Icons.extension_rounded),
+        leading: _buildSourceIcon(),
+        title: Text(
+          widget.source.name!,
+          style: const TextStyle(
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Text(
+                  completeLanguageName(widget.source.lang!.toLowerCase()),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  "v${widget.source.version!}",
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                if (widget.source.isObsolete ?? false) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.errorContainer,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      "OBSOLETE",
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
                   ),
-                  useCustomNetworkImage: false),
-        ),
-        title: Text(widget.source.name!),
-        subtitle: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(completeLanguageName(widget.source.lang!.toLowerCase()),
-                style:
-                    const TextStyle(fontWeight: FontWeight.w300, fontSize: 12)),
-            const SizedBox(width: 4),
-            Text(widget.source.version!,
-                style:
-                    const TextStyle(fontWeight: FontWeight.w300, fontSize: 12)),
-            if (widget.source.isObsolete ?? false)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Text("OBSOLETE",
-                    style: TextStyle(
-                        color: context.primaryColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12)),
-              )
+                ],
+              ],
+            ),
           ],
         ),
-        trailing: TextButton(
-          onPressed: widget.isTestSource || !updateAivalable && sourceNotEmpty
-              ? () {
-                  context.push('/extension_detail', extra: widget.source);
-                }
-              : () async {
-                  setState(() {
-                    _isLoading = true;
-                  });
-                  widget.source.itemType == ItemType.manga
-                      ? await ref.watch(fetchMangaSourcesListProvider(
-                              id: widget.source.id, reFresh: true)
-                          .future)
-                      : widget.source.itemType == ItemType.anime
-                          ? await ref.watch(fetchAnimeSourcesListProvider(
-                                  id: widget.source.id, reFresh: true)
-                              .future)
-                          : await ref.watch(fetchNovelSourcesListProvider(
-                                  id: widget.source.id, reFresh: true)
-                              .future);
-                  if (mounted) {
-                    setState(() {
-                      _isLoading = false;
-                    });
-                  }
-                },
-          child: _isLoading
-              ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.0,
-                  ))
-              : Text(widget.isTestSource
-                  ? l10n.settings
-                  : !sourceNotEmpty
-                      ? l10n.install
-                      : updateAivalable
-                          ? l10n.update
-                          : l10n.settings),
-        ));
+        trailing: _buildActionButton(
+          context,
+          widget.isTestSource
+              ? l10n.settings
+              : !_isSourceInstalled
+              ? l10n.install
+              : _needsUpdate
+              ? l10n.update
+              : l10n.settings,
+          isPrimary: !_isSourceInstalled || _needsUpdate,
+        ),
+      ),
+    );
   }
 }

@@ -93,7 +93,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with SingleTickerProvid
       Timer.periodic(Duration(minutes: 5), (timer) {
         ref.read(checkAndBackupProvider);
       });
-      ref.watch(checkForUpdateProvider(context: context));
+      //ref.watch(checkForUpdateProvider(context: context));
       ref.watch(fetchMangaSourcesListProvider(id: null, reFresh: false));
       ref.watch(fetchAnimeSourcesListProvider(id: null, reFresh: false));
       ref.watch(fetchNovelSourcesListProvider(id: null, reFresh: false));
